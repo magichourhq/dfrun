@@ -10,8 +10,14 @@ mod tests {
     use super::*;
 
     fn create_test_dockerfile(content: &str, test_name: &str) -> (PathBuf, PathBuf) {
-        // Create a test directory in the current directory with unique name
-        let test_dir = PathBuf::from(format!("temp/{}", test_name));
+        // Create temp directory if it doesn't exist
+        let temp_dir = PathBuf::from("temp");
+        if !temp_dir.exists() {
+            fs::create_dir(&temp_dir).expect("Failed to create temp directory");
+        }
+
+        // Create a test directory in the temp directory with unique name
+        let test_dir = temp_dir.join(format!("test_{}", test_name));
 
         // Try to remove the directory if it exists, with retries
         if test_dir.exists() {
@@ -155,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_workdir() {
-        let dockerfile_content = r#"WORKDIR temp/workdir
+        let dockerfile_content = r#"WORKDIR temp/test_workdir
 RUN pwd
 RUN mkdir new_folder && cd new_folder && touch file.txt
 RUN pwd"#;
