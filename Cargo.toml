@@ -1,6 +1,10 @@
 [package]
 name = "dfrun"
-version = "0.0.1"
+version = "0.1.0"
+authors = ["Your Name <your.email@example.com>"]
+description = "A simple Dockerfile runner"
+license = "MIT"
+repository = "https://github.com/yourusername/dfrun"
 edition = "2021"
 
 [dependencies]
@@ -10,4 +14,8 @@ colored = "2.1"
 
 [dev-dependencies]
 tempfile = "3.8"
+
+[[bin]]
+name = "dfrun"
+path = "src/main.rs"
 
