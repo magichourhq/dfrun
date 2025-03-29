@@ -1,6 +1,6 @@
 [package]
 name = "dfrun"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["David Hu <david@magichour.ai>"]
 description = "A simple Dockerfile runner"
 license = "MIT"
