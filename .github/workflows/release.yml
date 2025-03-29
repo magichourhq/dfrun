@@ -24,6 +24,10 @@ jobs:
             target: x86_64-apple-darwin
             binary_name: dfrun
             archive_name: dfrun-macos-x86_64.tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_name: dfrun
+            archive_name: dfrun-macos-arm64.tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             binary_name: dfrun.exe
