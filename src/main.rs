@@ -12,7 +12,7 @@ mod tests;
 
 fn main() {
     let matches = Command::new("dockerfile-runner")
-        .version("0.0.1")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("David Hu")
         .about("Runs a Dockerfile as a bash script")
         .arg(
