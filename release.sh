@@ -38,6 +38,7 @@ function release() {
     sed -i.bak "s/version = \"$version\"/version = \"$new_version\"/" Cargo.toml
     rm *.bak
     echo "Version bumped to $new_version"
+    cargo install --path .
 
     git add Cargo.toml
     git commit -m "Release: $new_version"
