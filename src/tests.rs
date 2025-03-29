@@ -88,7 +88,6 @@ mod tests {
 
         assert!(output.status.success());
 
-        // Clean up
         cleanup_test_dir(test_dir);
     }
 
@@ -109,7 +108,6 @@ mod tests {
 
         assert!(output.status.success());
 
-        // Clean up
         cleanup_test_dir(test_dir);
     }
 
