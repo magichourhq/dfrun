@@ -10,35 +10,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      release-id: ${{ steps.create-release.outputs.result }}
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Get version
-        run: echo "PACKAGE_VERSION=$(cargo pkgid | cut -d@ -f2)" >> $GITHUB_ENV
-      - name: Create release
-        id: create-release
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: `v${process.env.PACKAGE_VERSION}`,
-              name: `v${process.env.PACKAGE_VERSION}`,
-              draft: true,
-              prerelease: false,
-              generate_release_notes: true
-            })
-            return data.id
-
-  release:
-    name: Release - ${{ matrix.platform.os }}
+  build:
+    name: Build - ${{ matrix.platform.os }}
     runs-on: ${{ matrix.platform.os }}
-    needs: [create-release]
     strategy:
       matrix:
         platform:
@@ -83,33 +57,25 @@ jobs:
           name: ${{ matrix.platform.archive_name }}
           path: ${{ matrix.platform.archive_name }}
 
-      - name: Update Release
-        uses: actions/github-script@v6
-        with:
-          script: |
-            await github.rest.repos.uploadReleaseAsset({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: ${{ needs.create-release.outputs.release-id }},
-              name: '${{ matrix.platform.archive_name }}',
-              data: await fs.promises.readFile('${{ matrix.platform.archive_name }}')
-            })
-
-  publish-release:
+  release:
+    name: Create Release
     runs-on: ubuntu-latest
-    needs: [create-release, release]
-
+    needs: build
     steps:
-      - name: Publish release
-        uses: actions/github-script@v6
-        env:
-          releaseId: ${{ needs.create-release.outputs.release-id }}
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
         with:
-          script: |
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: process.env.releaseId,
-              draft: false,
-              prerelease: false
-            })
+          path: artifacts
+          pattern: dfrun-*.{tar.gz,zip}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/dfrun-*.tar.gz
+            artifacts/dfrun-*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
