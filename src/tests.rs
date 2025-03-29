@@ -139,8 +139,10 @@ mod tests {
 
     #[test]
     fn test_parse_add_url() {
-        let (test_dir, dockerfile_path) =
-            create_test_dockerfile("ADD https://example.com/file.txt ./file.txt", "add_url");
+        let (test_dir, dockerfile_path) = create_test_dockerfile(
+            "ADD https://example.com/file.txt ./temp/file.txt",
+            "add_url",
+        );
         println!("Dockerfile path: {:?}", dockerfile_path);
 
         let output = Command::new("cargo")
