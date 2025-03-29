@@ -22,10 +22,21 @@ fn main() {
                 .help("Path to the Dockerfile")
                 .default_value("Dockerfile"),
         )
+        .arg(
+            Arg::new("debug")
+                .short('d')
+                .long("debug")
+                .help("Enable debug logging")
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
 
+    let debug_enabled = matches.get_flag("debug");
     let dockerfile_path = matches.get_one::<String>("dockerfile").unwrap();
-    println!("📄 Reading Dockerfile from: {}", dockerfile_path);
+
+    if debug_enabled {
+        println!("📄 Reading Dockerfile from: {}", dockerfile_path);
+    }
     let file = fs::File::open(dockerfile_path).expect("Failed to open Dockerfile");
     let reader = io::BufReader::new(file);
 
@@ -40,16 +51,22 @@ fn main() {
 
     for line in reader.lines() {
         let line = line.expect("Failed to read line").trim().to_string();
-        println!("🔍 Processing line: {}", line);
+        if debug_enabled {
+            println!("🔍 Processing line: {}", line);
+        }
 
         if in_run_block {
             if line.ends_with("\\") {
-                println!("  ↪ Continuing multi-line RUN command");
+                if debug_enabled {
+                    println!("  ↪ Continuing multi-line RUN command");
+                }
                 run_command.push_str(&line[..line.len() - 1]);
                 run_command.push(' ');
             } else {
                 run_command.push_str(&line);
-                println!("🚀 Executing multi-line command: {}", run_command);
+                if debug_enabled {
+                    println!("🚀 Executing multi-line command: {}", run_command);
+                }
                 ProcessCommand::new("bash")
                     .arg("-c")
                     .arg(&run_command)
@@ -61,12 +78,16 @@ fn main() {
         } else if let Some(caps) = run_re.captures(&line) {
             let command = caps.get(1).unwrap().as_str();
             if command.ends_with("\\") {
-                println!("  ↪ Starting multi-line RUN command");
+                if debug_enabled {
+                    println!("  ↪ Starting multi-line RUN command");
+                }
                 run_command.push_str(&command[..command.len() - 1]);
                 run_command.push(' ');
                 in_run_block = true;
             } else {
-                println!("🚀 Executing command: {}", command);
+                if debug_enabled {
+                    println!("🚀 Executing command: {}", command);
+                }
                 ProcessCommand::new("bash")
                     .arg("-c")
                     .arg(command)
@@ -75,7 +96,9 @@ fn main() {
             }
         } else if let Some(caps) = add_re.captures(&line) {
             let url = caps.get(1).unwrap().as_str();
-            println!("📥 Downloading from URL: {}", url);
+            if debug_enabled {
+                println!("📥 Downloading from URL: {}", url);
+            }
             ProcessCommand::new("curl")
                 .args(["-O", url])
                 .status()
@@ -83,13 +106,17 @@ fn main() {
         } else if let Some(caps) = env_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str();
             let value = caps.get(2).unwrap().as_str();
-            println!("🔧 Setting environment variable: {}={}", key, value);
+            if debug_enabled {
+                println!("🔧 Setting environment variable: {}={}", key, value);
+            }
             env::set_var(key, value);
         } else if let Some(caps) = arg_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str().to_string();
             let default_value = caps.get(2).map(|v| v.as_str().to_string());
             let value = if let Some(default) = default_value {
-                println!("❓ ARG with default value: {}={}", key, default);
+                if debug_enabled {
+                    println!("❓ ARG with default value: {}={}", key, default);
+                }
                 println!("Enter value for ARG {} (default: {}): ", key, default);
                 let mut input = String::new();
                 io::stdin()
@@ -97,24 +124,34 @@ fn main() {
                     .expect("Failed to read input");
                 let input = input.trim();
                 if input.is_empty() {
-                    println!("  ↪ Using default value");
+                    if debug_enabled {
+                        println!("  ↪ Using default value");
+                    }
                     default
                 } else {
-                    println!("  ↪ Using provided value: {}", input);
+                    if debug_enabled {
+                        println!("  ↪ Using provided value: {}", input);
+                    }
                     input.to_string()
                 }
             } else {
-                println!("❓ ARG without default value: {}", key);
+                if debug_enabled {
+                    println!("❓ ARG without default value: {}", key);
+                }
                 println!("Enter value for ARG {}: ", key);
                 let mut input = String::new();
                 io::stdin()
                     .read_line(&mut input)
                     .expect("Failed to read input");
                 let input = input.trim().to_string();
-                println!("  ↪ Using provided value: {}", input);
+                if debug_enabled {
+                    println!("  ↪ Using provided value: {}", input);
+                }
                 input
             };
-            println!("🔧 Setting ARG variable: {}={}", key, value);
+            if debug_enabled {
+                println!("🔧 Setting ARG variable: {}={}", key, value);
+            }
             args_map.insert(key, value);
         }
     }
