@@ -40,7 +40,7 @@ function release() {
     echo "Version bumped to $new_version"
     cargo install --path .
 
-    git add Cargo.toml
+    git add Cargo.toml Cargo.lock
     git commit -m "Release: $new_version"
     git tag "v$new_version"
     git push origin "v$new_version"
