@@ -49,10 +49,12 @@ fn main() {
     let add_re = Regex::new(r"^ADD\s+(https?://\S+)\s+.*").unwrap();
     let env_re = Regex::new(r"^ENV\s+(\S+)\s+(.+)").unwrap();
     let arg_re = Regex::new(r"^ARG\s+([^=\s]+)(?:\s*=\s*(.+))?").unwrap();
+    let workdir_re = Regex::new(r"^WORKDIR\s+(.+)").unwrap();
 
     let mut args_map: HashMap<String, String> = HashMap::new();
     let mut run_command = String::new();
     let mut in_run_block = false;
+    let mut workdir = env::current_dir().unwrap().to_str().unwrap().to_string();
 
     for line in reader.lines() {
         let line = line.expect("Failed to read line").trim().to_string();
@@ -81,16 +83,40 @@ fn main() {
                     println!(
                         "{} {}",
                         "DEBUG:".bright_blue().bold(),
-                        format!("Action: Executing multi-line command: {}", run_command).green()
+                        format!(
+                            "Action: Executing multi-line command in {}: {}",
+                            workdir, run_command
+                        )
+                        .green()
                     );
                 }
-                ProcessCommand::new("bash")
+                let current_dir = env::current_dir().unwrap();
+                env::set_current_dir(&workdir).expect("Failed to change directory");
+                let status = ProcessCommand::new("bash")
                     .arg("-c")
                     .arg(&run_command)
                     .status()
                     .expect("Failed to execute command");
+                env::set_current_dir(current_dir).expect("Failed to restore directory");
+                if !status.success() {
+                    eprintln!("Command failed with status: {}", status);
+                }
                 run_command.clear();
                 in_run_block = false;
+            }
+        } else if let Some(caps) = workdir_re.captures(&line) {
+            let dir = caps.get(1).unwrap().as_str();
+            if debug_enabled {
+                println!(
+                    "{} {}",
+                    "DEBUG:".bright_blue().bold(),
+                    format!("Action: Setting working directory to: {}", dir).cyan()
+                );
+            }
+            workdir = dir.to_string();
+            // Create directory if it doesn't exist
+            if !fs::metadata(&workdir).is_ok() {
+                fs::create_dir_all(&workdir).expect("Failed to create working directory");
             }
         } else if let Some(caps) = run_re.captures(&line) {
             let command = caps.get(1).unwrap().as_str();
@@ -110,14 +136,20 @@ fn main() {
                     println!(
                         "{} {}",
                         "DEBUG:".bright_blue().bold(),
-                        format!("Action: Executing command: {}", command).green()
+                        format!("Action: Executing command in {}: {}", workdir, command).green()
                     );
                 }
-                ProcessCommand::new("bash")
+                let current_dir = env::current_dir().unwrap();
+                env::set_current_dir(&workdir).expect("Failed to change directory");
+                let status = ProcessCommand::new("bash")
                     .arg("-c")
                     .arg(command)
                     .status()
                     .expect("Failed to execute command");
+                env::set_current_dir(current_dir).expect("Failed to restore directory");
+                if !status.success() {
+                    eprintln!("Command failed with status: {}", status);
+                }
             }
         } else if let Some(caps) = add_re.captures(&line) {
             let url = caps.get(1).unwrap().as_str();
@@ -128,10 +160,16 @@ fn main() {
                     format!("Action: Downloading from URL: {}", url).cyan()
                 );
             }
-            ProcessCommand::new("curl")
+            let current_dir = env::current_dir().unwrap();
+            env::set_current_dir(&workdir).expect("Failed to change directory");
+            let status = ProcessCommand::new("curl")
                 .args(["-O", url])
                 .status()
                 .expect("Failed to execute curl");
+            env::set_current_dir(current_dir).expect("Failed to restore directory");
+            if !status.success() {
+                eprintln!("Download failed with status: {}", status);
+            }
         } else if let Some(caps) = env_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str();
             let value = caps.get(2).unwrap().as_str();

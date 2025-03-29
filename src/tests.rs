@@ -1,4 +1,3 @@
-use crate::*;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
@@ -12,7 +11,7 @@ mod tests {
 
     fn create_test_dockerfile(content: &str, test_name: &str) -> (PathBuf, PathBuf) {
         // Create a test directory in the current directory with unique name
-        let test_dir = PathBuf::from(format!("temp_{}", test_name));
+        let test_dir = PathBuf::from(format!("temp/{}", test_name));
 
         // Try to remove the directory if it exists, with retries
         if test_dir.exists() {
@@ -149,6 +148,53 @@ mod tests {
         println!("Command stderr: {}", stderr);
 
         assert!(output.status.success());
+
+        // Clean up
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_workdir() {
+        let dockerfile_content = r#"WORKDIR temp/workdir
+RUN pwd
+RUN mkdir new_folder && cd new_folder && touch file.txt
+RUN pwd"#;
+
+        let (test_dir, dockerfile_path) = create_test_dockerfile(dockerfile_content, "workdir");
+        println!("Dockerfile path: {:?}", dockerfile_path);
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("Command output: {}", stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("Command stderr: {}", stderr);
+
+        assert!(output.status.success());
+
+        // Extract pwd outputs from stdout
+        let lines: Vec<&str> = stdout.lines().collect();
+        let pwd_outputs: Vec<&str> = lines.iter().map(|line| line.trim()).collect();
+
+        // Verify both pwd commands show the same directory
+        assert_eq!(pwd_outputs.len(), 2, "Expected two pwd outputs");
+        assert_eq!(
+            pwd_outputs[0], pwd_outputs[1],
+            "pwd outputs should be the same: '{}' vs '{}'",
+            pwd_outputs[0], pwd_outputs[1]
+        );
+
+        // Verify the file was created in the correct location
+        let file_path = test_dir.join("new_folder/file.txt");
+        println!("Checking file path: {:?}", file_path);
+        assert!(
+            file_path.exists(),
+            "file.txt should exist in the correct path: {:?}",
+            file_path
+        );
 
         // Clean up
         cleanup_test_dir(test_dir);
