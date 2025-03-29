@@ -42,7 +42,33 @@ fn main() {
             format!("Reading Dockerfile from: {}", dockerfile_path).bright_white()
         );
     }
-    let file = fs::File::open(dockerfile_path).expect("Failed to open Dockerfile");
+
+    // Check if file exists first
+    if !fs::metadata(dockerfile_path).is_ok() {
+        eprintln!(
+            "{} {}",
+            "Error:".red().bold(),
+            format!("Dockerfile not found at: {}", dockerfile_path).bright_white()
+        );
+        eprintln!(
+            "{} {}",
+            "Hint:".yellow().bold(),
+            "Make sure the Dockerfile exists in the specified path or use -f/--file to specify a different path.".bright_white()
+        );
+        std::process::exit(1);
+    }
+
+    let file = match fs::File::open(dockerfile_path) {
+        Ok(file) => file,
+        Err(e) => {
+            eprintln!(
+                "{} {}",
+                "Error:".red().bold(),
+                format!("Failed to open Dockerfile: {}", e).bright_white()
+            );
+            std::process::exit(1);
+        }
+    };
     let reader = io::BufReader::new(file);
 
     let run_re = Regex::new(r"^RUN\s+(.*)").unwrap();
