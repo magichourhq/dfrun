@@ -41,7 +41,8 @@ function release() {
 
     git add Cargo.toml
     git commit -m "Release: $new_version"
-    git push
+    git tag "v$new_version"
+    git push origin "v$new_version"
 }
 
 gum confirm "Release $new_version?" && release
