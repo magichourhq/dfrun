@@ -1,6 +1,8 @@
 # dfrun - Dockerfile Runner
 
-`dfrun` is a simple command-line tool that runs Dockerfile instructions directly as shell commands. It's useful for testing Dockerfile commands locally without building a container.
+`dfrun` is a simple command-line tool that runs Dockerfile instructions directly as shell commands. 
+
+It's useful for getting setup on a VM without docker. For example, when using Remote SSH with VSCode.
 
 ## Features
 
