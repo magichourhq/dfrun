@@ -18,6 +18,9 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
             binary_name: dfrun
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary_name: dfrun
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             binary_name: dfrun.exe
@@ -29,6 +32,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform.target }}
+
+      - name: install build target
+        run: rustup target add ${{ matrix.target }}
 
       - name: Build
         run: cargo build --release --target ${{ matrix.platform.target }}
