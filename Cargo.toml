@@ -1,10 +1,10 @@
 [package]
 name = "dfrun"
-version = "0.1.0"
-authors = ["Your Name <your.email@example.com>"]
+version = "0.0.1"
+authors = ["David <david@magichour.ai>"]
 description = "A simple Dockerfile runner"
 license = "MIT"
-repository = "https://github.com/yourusername/dfrun"
+repository = "https://github.com/magichourhq/dfrun"
 edition = "2021"
 
 [dependencies]
