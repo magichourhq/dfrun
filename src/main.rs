@@ -43,7 +43,7 @@ fn main() {
     let run_re = Regex::new(r"^RUN\s+(.*)").unwrap();
     let add_re = Regex::new(r"^ADD\s+(https?://\S+)\s+.*").unwrap();
     let env_re = Regex::new(r"^ENV\s+(\S+)\s+(.+)").unwrap();
-    let arg_re = Regex::new(r"^ARG\s+(\S+)(?:\s*=\s*(.+))?").unwrap();
+    let arg_re = Regex::new(r"^ARG\s+([^=\s]+)(?:\s*=\s*(.+))?").unwrap();
 
     let mut args_map: HashMap<String, String> = HashMap::new();
     let mut run_command = String::new();
@@ -178,6 +178,12 @@ fn main() {
                 println!("🔧 Setting ARG variable: {}={}", key, value);
             }
             args_map.insert(key, value);
+        } else if !line.is_empty() && !line.starts_with('#') {
+            // Only log if line isn't empty and isn't a comment
+            if debug_enabled {
+                println!("DEBUG: Original command: {}", line);
+                println!("DEBUG: Action: Ignoring unsupported instruction");
+            }
         }
     }
 }
