@@ -90,18 +90,18 @@ Requirements:
 
 Setup:
 ```bash
-# Clone the repository
+# Clone the repository after forking
 git clone https://github.com/yourusername/dfrun
 cd dfrun
+
+# Install locally
+cargo install --path .
 
 # Build
 cargo build
 
 # Run tests
 cargo test
-
-# Install locally
-cargo install --path .
 ```
 
 ## Contributing
