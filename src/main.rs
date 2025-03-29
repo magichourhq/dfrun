@@ -44,7 +44,7 @@ fn main() {
     }
 
     // Check if file exists first
-    if !fs::metadata(dockerfile_path).is_ok() {
+    if fs::metadata(dockerfile_path).is_err() {
         eprintln!(
             "{} {}",
             "Error:".red().bold(),
@@ -101,8 +101,10 @@ fn main() {
                         "Action: Continuing multi-line RUN command".yellow()
                     );
                 }
-                run_command.push_str(&line[..line.len() - 1]);
-                run_command.push(' ');
+                if let Some(stripped) = line.strip_suffix("\\") {
+                    run_command.push_str(stripped);
+                    run_command.push(' ');
+                }
             } else {
                 run_command.push_str(&line);
                 if debug_enabled {
@@ -141,7 +143,7 @@ fn main() {
             }
             workdir = dir.to_string();
             // Create directory if it doesn't exist
-            if !fs::metadata(&workdir).is_ok() {
+            if fs::metadata(&workdir).is_err() {
                 fs::create_dir_all(&workdir).expect("Failed to create working directory");
             }
         } else if let Some(caps) = run_re.captures(&line) {
@@ -154,8 +156,10 @@ fn main() {
                         "Action: Starting multi-line RUN command".yellow()
                     );
                 }
-                run_command.push_str(&command[..command.len() - 1]);
-                run_command.push(' ');
+                if let Some(stripped) = command.strip_suffix("\\") {
+                    run_command.push_str(stripped);
+                    run_command.push(' ');
+                }
                 in_run_block = true;
             } else {
                 if debug_enabled {
@@ -210,7 +214,7 @@ fn main() {
         } else if let Some(caps) = arg_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str().to_string();
             let default_value = caps.get(2).map(|v| v.as_str().to_string());
-            let value = if let Some(default) = default_value {
+            if let Some(default) = default_value {
                 if debug_enabled {
                     println!(
                         "{} {}",
@@ -226,7 +230,7 @@ fn main() {
                     .read_line(&mut input)
                     .expect("Failed to read input");
                 let input = input.trim();
-                if input.is_empty() {
+                let value = if input.is_empty() {
                     if debug_enabled {
                         println!(
                             "{} {}",
@@ -244,7 +248,16 @@ fn main() {
                         );
                     }
                     input.to_string()
+                };
+
+                if debug_enabled {
+                    println!(
+                        "{} {}",
+                        "DEBUG:".bright_blue().bold(),
+                        format!("Action: Setting ARG variable: {}={}", key, value).magenta()
+                    );
                 }
+                args_map.insert(key, value);
             } else {
                 let env_value = env::var(&key).ok();
                 if debug_enabled {
@@ -274,24 +287,27 @@ fn main() {
                     .read_line(&mut input)
                     .expect("Failed to read input");
                 let input = input.trim();
-                if input.is_empty() && env_value.is_some() {
-                    if debug_enabled {
-                        println!(
-                            "{} {}",
-                            "DEBUG:".bright_blue().bold(),
-                            "Action: Using environment value".green()
-                        );
+                let value = if input.is_empty() {
+                    if let Some(env_val) = env_value {
+                        if debug_enabled {
+                            println!(
+                                "{} {}",
+                                "DEBUG:".bright_blue().bold(),
+                                "Action: Using environment value".green()
+                            );
+                        }
+                        env_val
+                    } else {
+                        if debug_enabled {
+                            println!(
+                                "{} {}",
+                                "DEBUG:".bright_blue().bold(),
+                                "Action: No value provided".red()
+                            );
+                        }
+                        eprintln!("Error: No value provided for ARG {}", key);
+                        std::process::exit(1);
                     }
-                    env_value.unwrap()
-                } else if input.is_empty() {
-                    if debug_enabled {
-                        println!(
-                            "{} {}",
-                            "DEBUG:".bright_blue().bold(),
-                            "Action: Using empty value".red()
-                        );
-                    }
-                    String::new()
                 } else {
                     if debug_enabled {
                         println!(
@@ -301,29 +317,28 @@ fn main() {
                         );
                     }
                     input.to_string()
+                };
+
+                if debug_enabled {
+                    println!(
+                        "{} {}",
+                        "DEBUG:".bright_blue().bold(),
+                        format!("Action: Setting ARG variable: {}={}", key, value).magenta()
+                    );
                 }
+                args_map.insert(key, value);
             };
-            if debug_enabled {
-                println!(
-                    "{} {}",
-                    "DEBUG:".bright_blue().bold(),
-                    format!("Action: Setting ARG variable: {}={}", key, value).magenta()
-                );
-            }
-            args_map.insert(key, value);
-        } else if !line.is_empty() && !line.starts_with('#') {
-            if debug_enabled {
-                println!(
-                    "{} {}",
-                    "DEBUG:".bright_blue().bold(),
-                    format!("Original command: {}", line).bright_white()
-                );
-                println!(
-                    "{} {}",
-                    "DEBUG:".bright_blue().bold(),
-                    "Action: Ignoring unsupported instruction".red()
-                );
-            }
+        } else if !line.is_empty() && !line.starts_with('#') && debug_enabled {
+            println!(
+                "{} {}",
+                "DEBUG:".bright_blue().bold(),
+                format!("Original command: {}", line).bright_white()
+            );
+            println!(
+                "{} {}",
+                "DEBUG:".bright_blue().bold(),
+                "Action: Ignoring unsupported instruction".red()
+            );
         }
     }
 }
