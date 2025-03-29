@@ -73,7 +73,7 @@ jobs:
           pattern: dfrun-*.{tar.gz,zip}
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/dfrun-macos-arm64.tar.gz
