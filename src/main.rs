@@ -11,7 +11,7 @@ use std::process::Command as ProcessCommand;
 mod tests;
 
 fn main() {
-    let matches = Command::new("dockerfile-runner")
+    let matches = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("David Hu")
         .about("Runs a Dockerfile as a bash script")
