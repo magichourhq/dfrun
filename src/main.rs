@@ -3,7 +3,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::process::Command as ProcessCommand;
 
 #[cfg(test)]
@@ -117,7 +117,8 @@ fn main() {
                 if debug_enabled {
                     println!("❓ ARG with default value: {}={}", key, default);
                 }
-                println!("Enter value for ARG {} (default: {}): ", key, default);
+                print!("Enter value for ARG {} (default: {}): ", key, default);
+                io::stdout().flush().expect("Failed to flush stdout");
                 let mut input = String::new();
                 io::stdin()
                     .read_line(&mut input)
@@ -135,19 +136,43 @@ fn main() {
                     input.to_string()
                 }
             } else {
+                // Check if there's an environment variable with this name
+                let env_value = env::var(&key).ok();
                 if debug_enabled {
                     println!("❓ ARG without default value: {}", key);
+                    if let Some(ref val) = env_value {
+                        println!("  Found environment value: {}", val);
+                    }
                 }
-                println!("Enter value for ARG {}: ", key);
+                print!(
+                    "Enter value for ARG {}{}: ",
+                    key,
+                    env_value
+                        .as_ref()
+                        .map_or("".to_string(), |v| format!(" (default: {})", v))
+                );
+                io::stdout().flush().expect("Failed to flush stdout");
                 let mut input = String::new();
                 io::stdin()
                     .read_line(&mut input)
                     .expect("Failed to read input");
-                let input = input.trim().to_string();
-                if debug_enabled {
-                    println!("  ↪ Using provided value: {}", input);
+                let input = input.trim();
+                if input.is_empty() && env_value.is_some() {
+                    if debug_enabled {
+                        println!("  ↪ Using environment value");
+                    }
+                    env_value.unwrap()
+                } else if input.is_empty() {
+                    if debug_enabled {
+                        println!("  ↪ Using empty value");
+                    }
+                    String::new()
+                } else {
+                    if debug_enabled {
+                        println!("  ↪ Using provided value: {}", input);
+                    }
+                    input.to_string()
                 }
-                input
             };
             if debug_enabled {
                 println!("🔧 Setting ARG variable: {}={}", key, value);

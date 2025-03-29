@@ -8,7 +8,7 @@ ENV BUILD_TIMESTAMP=$BUILD_DATE
 ENV DEBUG=true
 
 # Test ADD with URL download
-ADD https://raw.githubusercontent.com/rust-lang/rust/master/README.md ./README.md
+ADD https://raw.githubusercontent.com/rust-lang/rust/master/README.md ./test.md
 
 # Test single-line RUN command
 RUN echo "Building version $APP_VERSION"
@@ -20,5 +20,5 @@ RUN echo "Starting multi-line command" && \
     echo "End of multi-line command"
 
 # Test RUN with file interaction
-RUN cat README.md | head -n 5 && \
+RUN cat test.md | head -n 5 && \
     echo "=== File contents above ===" 
