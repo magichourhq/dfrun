@@ -118,7 +118,7 @@ dependencies = [
 
 [[package]]
 name = "dfrun"
-version = "0.0.6"
+version = "0.0.7"
 dependencies = [
  "clap",
  "colored",
