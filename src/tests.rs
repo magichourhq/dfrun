@@ -76,7 +76,7 @@ mod tests {
     #[test]
     fn test_parse_arg_with_default() {
         let (test_dir, dockerfile_path) =
-            create_test_dockerfile("ARG VERSION=1.0.0", "arg_default");
+            create_test_dockerfile("ARG VERSION=1.0.0", "arg_with_default");
         println!("Dockerfile path: {:?}", dockerfile_path);
 
         let mut child = Command::new("cargo")
