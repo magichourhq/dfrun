@@ -17,7 +17,7 @@ It's useful for getting setup on a VM without docker. For example, when using Re
 ## Installation
 
 ### From Releases
-Download the latest release for your platform from the [releases page](https://github.com/yourusername/dfrun/releases).
+Download the latest release for your platform from the [releases page](https://github.com/magichourhq/dfrun/releases).
 
 #### Linux/macOS
 ```bash
@@ -34,13 +34,14 @@ sudo mv dfrun /usr/local/bin/
 
 ### From Source
 ```bash
-cargo install --git https://github.com/yourusername/dfrun
+cargo install --git https://github.com/magichourhq/dfrun
 ```
 
 ## Usage
 
 Basic usage:
 ```bash
+cd /dir/with/Dockerfile
 dfrun
 ```
 
@@ -91,7 +92,7 @@ Requirements:
 Setup:
 ```bash
 # Clone the repository after forking
-git clone https://github.com/yourusername/dfrun
+git clone https://github.com/magichourhq/dfrun
 cd dfrun
 
 # Install locally
