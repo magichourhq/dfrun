@@ -78,7 +78,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release-files/*
+            release-files/*/*
           draft: false
           prerelease: false
           generate_release_notes: true
