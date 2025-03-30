@@ -1,6 +1,6 @@
 # dfrun - Dockerfile Runner
 
-`dfrun` is a simple command-line tool that runs Dockerfile instructions directly as shell commands. 
+`dfrun` is a simple command-line tool that runs Dockerfile instructions directly as shell commands.
 
 It's useful for getting setup on a VM without docker. For example, when using Remote SSH with VSCode.
 
@@ -17,22 +17,46 @@ It's useful for getting setup on a VM without docker. For example, when using Re
 ## Installation
 
 ### From Releases
+
 Download the latest release for your platform from the [releases page](https://github.com/magichourhq/dfrun/releases).
 
-#### Linux/macOS
+#### macOS
+
+**Arm Based Macs**
+
 ```bash
 # Download and extract
-tar -xzf dfrun-<target>.tar.gz
+tar -xzf dfrun-macos-arm64.tar.gz
+# Move to a directory in your PATH
+sudo mv dfrun /usr/local/bin/
+```
+
+**Intel Based Macs**
+
+```bash
+# Download and extract
+tar -xzf dfrun-macos-x86_64.tar.gz
+# Move to a directory in your PATH
+sudo mv dfrun /usr/local/bin/
+```
+
+#### Linux
+
+```bash
+# Download and extract
+tar -xzf dfrun-linux-x86_64.tar.gz
 # Move to a directory in your PATH
 sudo mv dfrun /usr/local/bin/
 ```
 
 #### Windows
+
 ```powershell
 # Extract the archive and add to your PATH
 ```
 
 ### From Source
+
 ```bash
 cargo install --git https://github.com/magichourhq/dfrun
 ```
@@ -40,56 +64,66 @@ cargo install --git https://github.com/magichourhq/dfrun
 ## Usage
 
 Basic usage:
+
 ```bash
 cd /dir/with/Dockerfile
 dfrun
 ```
 
 With a specific Dockerfile:
+
 ```bash
 dfrun -f path/to/Dockerfile
 ```
 
 With debug output:
+
 ```bash
-dfrun -d
+dfrun --debug
 ```
 
 ### Supported Dockerfile Instructions
 
-- `RUN`: Executes shell commands
-  ```dockerfile
-  RUN echo "Hello, World!"
-  ```
+`WORKDIR`: This command is ignored.
 
-- `ENV`: Sets environment variables
-  ```dockerfile
-  ENV MY_VAR=value
-  ```
+```dockerfile
+WORKDIR /app
+```
 
-- `ARG`: Prompts for values with optional defaults
-  ```dockerfile
-  ARG VERSION=1.0
-  ARG USER
-  ```
+`RUN`: Executes shell commands
 
-- `ADD`: Downloads files from URLs
-  ```dockerfile
-  ADD https://example.com/file.txt .
-  ```
+```dockerfile
+RUN echo "Hello, World!"
+```
 
-- `WORKDIR`: Changes working directory
-  ```dockerfile
-  WORKDIR /app
-  ```
+`ENV`: Sets environment variables
+
+```dockerfile
+ENV MY_VAR=value
+```
+
+`ARG`: Prompts for values with optional defaults
+
+```dockerfile
+ARG VERSION=1.0
+ARG USER
+```
+
+`ADD`: Downloads files from URLs
+
+```dockerfile
+ADD https://example.com/file.txt .
+```
 
 ## Development
 
 Requirements:
+
 - Rust 1.70 or later
 - Cargo
 
 Setup:
+
 ```bash
 # Clone the repository after forking
 git clone https://github.com/magichourhq/dfrun
@@ -111,4 +145,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
