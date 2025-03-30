@@ -20,7 +20,7 @@ fn main() {
                 .short('f')
                 .long("file")
                 .value_name("DOCKERFILE")
-                .help("Path to the Dockerfile")
+                .help("Path to the Dockerfile. Default to Dockerfile in current directory.")
                 .default_value("Dockerfile"),
         )
         .arg(
