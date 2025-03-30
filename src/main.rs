@@ -80,7 +80,7 @@ fn main() {
     let mut args_map: HashMap<String, String> = HashMap::new();
     let mut run_command = String::new();
     let mut in_run_block = false;
-    let mut workdir = env::current_dir().unwrap().to_str().unwrap().to_string();
+    let workdir = env::current_dir().unwrap();
 
     for line in reader.lines() {
         let line = line.expect("Failed to read line").trim().to_string();
@@ -113,7 +113,8 @@ fn main() {
                         "DEBUG:".bright_blue().bold(),
                         format!(
                             "Action: Executing multi-line command in {}: {}",
-                            workdir, run_command
+                            workdir.display(),
+                            run_command
                         )
                         .green()
                     );
@@ -138,13 +139,8 @@ fn main() {
                 println!(
                     "{} {}",
                     "DEBUG:".bright_blue().bold(),
-                    format!("Action: Setting working directory to: {}", dir).cyan()
+                    format!("Action: Ignoring WORKDIR instruction: {}", dir).cyan()
                 );
-            }
-            workdir = dir.to_string();
-            // Create directory if it doesn't exist
-            if fs::metadata(&workdir).is_err() {
-                fs::create_dir_all(&workdir).expect("Failed to create working directory");
             }
         } else if let Some(caps) = run_re.captures(&line) {
             let command = caps.get(1).unwrap().as_str();
@@ -166,7 +162,12 @@ fn main() {
                     println!(
                         "{} {}",
                         "DEBUG:".bright_blue().bold(),
-                        format!("Action: Executing command in {}: {}", workdir, command).green()
+                        format!(
+                            "Action: Executing command in {}: {}",
+                            workdir.display(),
+                            command
+                        )
+                        .green()
                     );
                 }
                 let current_dir = env::current_dir().unwrap();
