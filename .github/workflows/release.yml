@@ -71,7 +71,7 @@ jobs:
         with:
           path: release-files
       - run: |
-          apt-get install tree 
+          sudo apt-get install -y tree 
           tree .
 
       - name: Create Release
