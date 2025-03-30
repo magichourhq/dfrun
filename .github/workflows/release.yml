@@ -69,17 +69,16 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: dfrun-*.{tar.gz,zip}
-      - run: ls
+          path: release-files
+      - run: |
+          apt-get install tree 
+          tree .
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dfrun-macos-arm64.tar.gz
-            dfrun-macos-x86_64.tar.gz
-            dfrun-linux-x86_64.tar.gz
-            dfrun-windows-x86_64.zip
+            release-files/*
           draft: false
           prerelease: false
           generate_release_notes: true
