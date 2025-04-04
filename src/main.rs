@@ -1,7 +1,6 @@
 use clap::{Arg, Command};
 use colored::*;
 use regex::Regex;
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, BufRead, Write};
@@ -77,7 +76,6 @@ fn main() {
     let arg_re = Regex::new(r"^ARG\s+([^=\s]+)(?:\s*=\s*(.+))?").unwrap();
     let workdir_re = Regex::new(r"^WORKDIR\s+(.+)").unwrap();
 
-    let mut args_map: HashMap<String, String> = HashMap::new();
     let mut run_command = String::new();
     let mut in_run_block = false;
     let workdir = env::current_dir().unwrap();
@@ -258,7 +256,7 @@ fn main() {
                         format!("Action: Setting ARG variable: {}={}", key, value).magenta()
                     );
                 }
-                args_map.insert(key, value);
+                env::set_var(key, value);
             } else {
                 let env_value = env::var(&key).ok();
                 if debug_enabled {
@@ -327,7 +325,7 @@ fn main() {
                         format!("Action: Setting ARG variable: {}={}", key, value).magenta()
                     );
                 }
-                args_map.insert(key, value);
+                env::set_var(key, value);
             };
         } else if !line.is_empty() && !line.starts_with('#') && debug_enabled {
             println!(
