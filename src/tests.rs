@@ -202,4 +202,67 @@ RUN pwd"#;
 
         cleanup_test_dir(test_dir);
     }
+
+    #[test]
+    fn test_arg_env_interaction() {
+        let dockerfile_content = r#"ARG VERSION=1.0.0
+ENV APP_VERSION=$VERSION
+ENV BUILD_TYPE=release
+RUN echo "Building version $APP_VERSION in $BUILD_TYPE mode"
+RUN echo "VERSION=$VERSION" > version.txt
+RUN echo "APP_VERSION=$APP_VERSION" >> version.txt
+RUN echo "BUILD_TYPE=$BUILD_TYPE" >> version.txt"#;
+
+        let (test_dir, dockerfile_path) = create_test_dockerfile(dockerfile_content, "arg_env");
+        println!("Dockerfile path: {:?}", dockerfile_path);
+
+        let mut child = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn command");
+
+        // Send empty input to use default value for ARG
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin.write_all(b"\n").expect("Failed to write to stdin");
+        }
+
+        let output = child.wait_with_output().expect("Failed to wait on child");
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("Command output: {}", stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        println!("Command stderr: {}", stderr);
+
+        assert!(output.status.success());
+
+        // Verify the version.txt file was created and contains the correct values
+        let version_file = PathBuf::from("version.txt");
+        println!("Checking version file path: {:?}", version_file);
+        assert!(version_file.exists(), "version.txt should exist");
+
+        let version_content =
+            fs::read_to_string(&version_file).expect("Failed to read version.txt");
+        println!("Version file content: {}", version_content);
+
+        let lines: Vec<&str> = version_content.lines().collect();
+        assert_eq!(lines.len(), 3, "version.txt should have 3 lines");
+
+        // Verify each line contains the expected value
+        assert!(
+            lines.iter().any(|line| *line == "VERSION=1.0.0"),
+            "version.txt should contain VERSION=1.0.0"
+        );
+        assert!(
+            lines.iter().any(|line| *line == "APP_VERSION=1.0.0"),
+            "version.txt should contain APP_VERSION=1.0.0"
+        );
+        assert!(
+            lines.iter().any(|line| *line == "BUILD_TYPE=release"),
+            "version.txt should contain BUILD_TYPE=release"
+        );
+
+        cleanup_test_dir(test_dir);
+    }
 }
