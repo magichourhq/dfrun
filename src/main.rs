@@ -5,27 +5,10 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
 
 #[cfg(test)]
 mod tests;
-
-fn expand_vars(s: &str, vars_map: &HashMap<String, String>) -> String {
-    let mut result = s.to_string();
-    // Sort keys by length in descending order to handle nested variables correctly
-    let mut keys: Vec<_> = vars_map.keys().collect();
-    keys.sort_by(|a, b| b.len().cmp(&a.len()));
-
-    // Expand all variables from vars_map
-    for key in keys {
-        if let Some(value) = vars_map.get(key) {
-            result = result.replace(&format!("${}", key), value);
-            result = result.replace(&format!("${{{}}}", key), value);
-        }
-    }
-    result
-}
 
 fn main() {
     let matches = Command::new(env!("CARGO_PKG_NAME"))
@@ -94,24 +77,10 @@ fn main() {
     let arg_re = Regex::new(r"^ARG\s+([^=\s]+)(?:\s*=\s*(.+))?").unwrap();
     let workdir_re = Regex::new(r"^WORKDIR\s+(.+)").unwrap();
 
-    let mut vars_map: HashMap<String, String> = HashMap::new();
+    let mut args_map: HashMap<String, String> = HashMap::new();
     let mut run_command = String::new();
     let mut in_run_block = false;
-    let dockerfile_dir = PathBuf::from(dockerfile_path)
-        .canonicalize()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_path_buf();
-    let mut workdir = dockerfile_dir.clone();
-
-    // Create initial workdir if it doesn't exist
-    if !workdir.exists() {
-        fs::create_dir_all(&workdir).expect("Failed to create working directory");
-    }
-
-    // Change to the initial workdir
-    env::set_current_dir(&workdir).expect("Failed to change to initial directory");
+    let workdir = env::current_dir().unwrap();
 
     for line in reader.lines() {
         let line = line.expect("Failed to read line").trim().to_string();
@@ -152,70 +121,25 @@ fn main() {
                 }
                 let current_dir = env::current_dir().unwrap();
                 env::set_current_dir(&workdir).expect("Failed to change directory");
-                let expanded_command = expand_vars(&run_command, &vars_map);
                 let status = ProcessCommand::new("bash")
                     .arg("-c")
-                    .arg(&expanded_command)
+                    .arg(&run_command)
                     .status()
                     .expect("Failed to execute command");
                 env::set_current_dir(current_dir).expect("Failed to restore directory");
                 if !status.success() {
                     eprintln!("Command failed with status: {}", status);
-                    std::process::exit(1);
                 }
                 run_command.clear();
                 in_run_block = false;
             }
-        } else if let Some(caps) = env_re.captures(&line) {
-            let key = caps.get(1).unwrap().as_str();
-            let value = caps.get(2).unwrap().as_str();
-            if debug_enabled {
-                println!(
-                    "{} {}",
-                    "DEBUG:".bright_blue().bold(),
-                    format!("Action: Setting environment variable: {}={}", key, value).magenta()
-                );
-            }
-            // First expand variables in the ENV value
-            let expanded_value = expand_vars(value, &vars_map);
-            if debug_enabled {
-                println!(
-                    "{} {}",
-                    "DEBUG:".bright_blue().bold(),
-                    format!("Action: Expanded value: {}={}", key, expanded_value).magenta()
-                );
-            }
-            // Set both in environment and vars_map
-            env::set_var(key, &expanded_value);
-            vars_map.insert(key.to_string(), expanded_value);
         } else if let Some(caps) = workdir_re.captures(&line) {
             let dir = caps.get(1).unwrap().as_str();
             if debug_enabled {
                 println!(
                     "{} {}",
                     "DEBUG:".bright_blue().bold(),
-                    format!("Action: Setting working directory to: {}", dir).cyan()
-                );
-            }
-            // First expand variables in the directory path
-            let expanded_dir = expand_vars(dir, &vars_map);
-            // If the path is absolute, use it as is, otherwise join with dockerfile directory
-            workdir = if PathBuf::from(&expanded_dir).is_absolute() {
-                PathBuf::from(&expanded_dir)
-            } else {
-                dockerfile_dir.join(&expanded_dir)
-            };
-            // Create directory if it doesn't exist
-            if fs::metadata(&workdir).is_err() {
-                fs::create_dir_all(&workdir).expect("Failed to create working directory");
-            }
-            // Actually change to the directory to verify it works
-            env::set_current_dir(&workdir).expect("Failed to change directory");
-            if debug_enabled {
-                println!(
-                    "{} {}",
-                    "DEBUG:".bright_blue().bold(),
-                    format!("Action: Changed to directory: {}", workdir.display()).cyan()
+                    format!("Action: Ignoring WORKDIR instruction: {}", dir).cyan()
                 );
             }
         } else if let Some(caps) = run_re.captures(&line) {
@@ -248,16 +172,14 @@ fn main() {
                 }
                 let current_dir = env::current_dir().unwrap();
                 env::set_current_dir(&workdir).expect("Failed to change directory");
-                let expanded_command = expand_vars(command, &vars_map);
                 let status = ProcessCommand::new("bash")
                     .arg("-c")
-                    .arg(&expanded_command)
+                    .arg(command)
                     .status()
                     .expect("Failed to execute command");
                 env::set_current_dir(current_dir).expect("Failed to restore directory");
                 if !status.success() {
                     eprintln!("Command failed with status: {}", status);
-                    std::process::exit(1);
                 }
             }
         } else if let Some(caps) = add_re.captures(&line) {
@@ -279,6 +201,17 @@ fn main() {
             if !status.success() {
                 eprintln!("Download failed with status: {}", status);
             }
+        } else if let Some(caps) = env_re.captures(&line) {
+            let key = caps.get(1).unwrap().as_str();
+            let value = caps.get(2).unwrap().as_str();
+            if debug_enabled {
+                println!(
+                    "{} {}",
+                    "DEBUG:".bright_blue().bold(),
+                    format!("Action: Setting environment variable: {}={}", key, value).magenta()
+                );
+            }
+            env::set_var(key, value);
         } else if let Some(caps) = arg_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str().to_string();
             let default_value = caps.get(2).map(|v| v.as_str().to_string());
@@ -325,7 +258,7 @@ fn main() {
                         format!("Action: Setting ARG variable: {}={}", key, value).magenta()
                     );
                 }
-                vars_map.insert(key, value);
+                args_map.insert(key, value);
             } else {
                 let env_value = env::var(&key).ok();
                 if debug_enabled {
@@ -394,7 +327,7 @@ fn main() {
                         format!("Action: Setting ARG variable: {}={}", key, value).magenta()
                     );
                 }
-                vars_map.insert(key, value);
+                args_map.insert(key, value);
             };
         } else if !line.is_empty() && !line.starts_with('#') && debug_enabled {
             println!(
