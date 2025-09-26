@@ -9,7 +9,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.38", features = ["derive"] }
-regex = "1.11.1"
+regex = "1.11.3"
 colored = "3.0.0"
 
 [[bin]]
