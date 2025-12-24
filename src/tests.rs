@@ -265,4 +265,288 @@ RUN echo "BUILD_TYPE=$BUILD_TYPE" >> version.txt"#;
 
         cleanup_test_dir(test_dir);
     }
+
+    #[test]
+    fn test_env_with_equals_syntax() {
+        // Test ENV with KEY=VALUE syntax (no space)
+        let dockerfile_content = r#"ENV MY_VAR=hello_world
+RUN echo "MY_VAR=$MY_VAR" > env_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "env_equals_syntax");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let env_file = PathBuf::from("env_test.txt");
+        assert!(env_file.exists(), "env_test.txt should exist");
+
+        let content = fs::read_to_string(&env_file).expect("Failed to read env_test.txt");
+        assert!(
+            content.contains("MY_VAR=hello_world"),
+            "env_test.txt should contain MY_VAR=hello_world, got: {}",
+            content
+        );
+
+        fs::remove_file(env_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_env_with_space_syntax() {
+        // Test ENV with KEY VALUE syntax (space separated)
+        let dockerfile_content = r#"ENV MY_VAR hello_world
+RUN echo "MY_VAR=$MY_VAR" > env_space_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "env_space_syntax");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let env_file = PathBuf::from("env_space_test.txt");
+        assert!(env_file.exists(), "env_space_test.txt should exist");
+
+        let content = fs::read_to_string(&env_file).expect("Failed to read env_space_test.txt");
+        assert!(
+            content.contains("MY_VAR=hello_world"),
+            "env_space_test.txt should contain MY_VAR=hello_world, got: {}",
+            content
+        );
+
+        fs::remove_file(env_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_env_variable_expansion() {
+        // Test that ENV expands variables from ARG
+        let dockerfile_content = r#"ARG BASE_VERSION=2.0.0
+ENV FULL_VERSION=${BASE_VERSION}-stable
+RUN echo "FULL_VERSION=$FULL_VERSION" > expand_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "env_var_expansion");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("expand_test.txt");
+        assert!(test_file.exists(), "expand_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read expand_test.txt");
+        assert!(
+            content.contains("FULL_VERSION=2.0.0-stable"),
+            "expand_test.txt should contain FULL_VERSION=2.0.0-stable, got: {}",
+            content
+        );
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_env_overwrite() {
+        // Test that ENV can overwrite a previous ENV value
+        let dockerfile_content = r#"ENV VERSION=1.0.0
+ENV VERSION=${VERSION}-updated
+RUN echo "VERSION=$VERSION" > overwrite_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "env_overwrite");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("overwrite_test.txt");
+        assert!(test_file.exists(), "overwrite_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read overwrite_test.txt");
+        assert!(
+            content.contains("VERSION=1.0.0-updated"),
+            "overwrite_test.txt should contain VERSION=1.0.0-updated, got: {}",
+            content
+        );
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_multiline_run() {
+        // Test multi-line RUN commands with backslash continuation
+        let dockerfile_content = r#"RUN echo "line1" > multiline_test.txt && \
+    echo "line2" >> multiline_test.txt && \
+    echo "line3" >> multiline_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "multiline_run");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("multiline_test.txt");
+        assert!(test_file.exists(), "multiline_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read multiline_test.txt");
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 3, "multiline_test.txt should have 3 lines");
+        assert_eq!(lines[0], "line1");
+        assert_eq!(lines[1], "line2");
+        assert_eq!(lines[2], "line3");
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_arg_from_environment() {
+        // Test that ARG picks up value from environment variable
+        let dockerfile_content = r#"ARG MY_ARG
+RUN echo "MY_ARG=$MY_ARG" > arg_env_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "arg_from_env");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .env("MY_ARG", "from_environment")
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("arg_env_test.txt");
+        assert!(test_file.exists(), "arg_env_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read arg_env_test.txt");
+        assert!(
+            content.contains("MY_ARG=from_environment"),
+            "arg_env_test.txt should contain MY_ARG=from_environment, got: {}",
+            content
+        );
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_unsupported_instructions_ignored() {
+        // Test that unsupported instructions are ignored without error
+        let dockerfile_content = r#"FROM ubuntu:22.04
+COPY . /app
+EXPOSE 8080
+CMD ["echo", "done"]
+LABEL maintainer="test"
+USER nobody
+VOLUME /data
+RUN echo "success" > unsupported_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "unsupported_instructions");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("unsupported_test.txt");
+        assert!(test_file.exists(), "unsupported_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read unsupported_test.txt");
+        assert!(
+            content.contains("success"),
+            "unsupported_test.txt should contain 'success', got: {}",
+            content
+        );
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_comments_ignored() {
+        // Test that comments are properly ignored
+        let dockerfile_content = r#"# This is a comment
+ARG VERSION=1.0.0
+# Another comment
+ENV APP_VERSION=$VERSION
+# Comment before RUN
+RUN echo "VERSION=$APP_VERSION" > comment_test.txt"#;
+
+        let (test_dir, dockerfile_path) =
+            create_test_dockerfile(dockerfile_content, "comments_ignored");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("comment_test.txt");
+        assert!(test_file.exists(), "comment_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read comment_test.txt");
+        assert!(
+            content.contains("VERSION=1.0.0"),
+            "comment_test.txt should contain VERSION=1.0.0, got: {}",
+            content
+        );
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
+
+    #[test]
+    fn test_nested_variable_expansion_in_run() {
+        // Test that bash correctly expands nested variables in RUN
+        let dockerfile_content = r#"ARG PREFIX=app
+ARG SUFFIX=prod
+RUN export COMBINED="${PREFIX}_${SUFFIX}" && echo "COMBINED=$COMBINED" > nested_test.txt"#;
+
+        let (test_dir, dockerfile_path) = create_test_dockerfile(dockerfile_content, "nested_vars");
+
+        let output = Command::new("cargo")
+            .args(["run", "--", "-f", dockerfile_path.to_str().unwrap()])
+            .output()
+            .expect("Failed to execute command");
+
+        assert!(output.status.success());
+
+        let test_file = PathBuf::from("nested_test.txt");
+        assert!(test_file.exists(), "nested_test.txt should exist");
+
+        let content = fs::read_to_string(&test_file).expect("Failed to read nested_test.txt");
+        assert!(
+            content.contains("COMBINED=app_prod"),
+            "nested_test.txt should contain COMBINED=app_prod, got: {}",
+            content
+        );
+
+        fs::remove_file(test_file).ok();
+        cleanup_test_dir(test_dir);
+    }
 }
