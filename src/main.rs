@@ -3,11 +3,21 @@ use colored::*;
 use regex::Regex;
 use std::env;
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::process::Command as ProcessCommand;
 
 #[cfg(test)]
 mod tests;
+
+/// Expands environment variables in a string (supports $VAR and ${VAR} syntax)
+fn expand_env_vars(s: &str) -> String {
+    let re = Regex::new(r"\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?").unwrap();
+    re.replace_all(s, |caps: &regex::Captures| {
+        let var_name = caps.get(1).unwrap().as_str();
+        env::var(var_name).unwrap_or_default()
+    })
+    .to_string()
+}
 
 fn main() {
     let matches = Command::new(env!("CARGO_PKG_NAME"))
@@ -72,7 +82,7 @@ fn main() {
 
     let run_re = Regex::new(r"^RUN\s+(.*)").unwrap();
     let add_re = Regex::new(r"^ADD\s+(https?://\S+)\s+.*").unwrap();
-    let env_re = Regex::new(r"^ENV\s+(\S+)\s+(.+)").unwrap();
+    let env_re = Regex::new(r"^ENV\s+(\S+?)(?:=|\s+)(.+)").unwrap();
     let arg_re = Regex::new(r"^ARG\s+([^=\s]+)(?:\s*=\s*(.+))?").unwrap();
     let workdir_re = Regex::new(r"^WORKDIR\s+(.+)").unwrap();
 
@@ -201,84 +211,45 @@ fn main() {
             }
         } else if let Some(caps) = env_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str();
-            let value = caps.get(2).unwrap().as_str();
+            let raw_value = caps.get(2).unwrap().as_str();
+            let value = expand_env_vars(raw_value);
             if debug_enabled {
                 println!(
                     "{} {}",
                     "DEBUG:".bright_blue().bold(),
-                    format!("Action: Setting environment variable: {}={}", key, value).magenta()
+                    format!(
+                        "Action: Setting environment variable: {}={} (expanded from {})",
+                        key, value, raw_value
+                    )
+                    .magenta()
                 );
             }
             env::set_var(key, value);
         } else if let Some(caps) = arg_re.captures(&line) {
             let key = caps.get(1).unwrap().as_str().to_string();
             let default_value = caps.get(2).map(|v| v.as_str().to_string());
-            if let Some(default) = default_value {
-                if debug_enabled {
-                    println!(
-                        "{} {}",
-                        "DEBUG:".bright_blue().bold(),
-                        format!("Action: Found ARG with default value: {}={}", key, default)
-                            .yellow()
-                    );
-                }
-                print!("Enter value for ARG {} (default: {}): ", key, default);
-                io::stdout().flush().expect("Failed to flush stdout");
-                let mut input = String::new();
-                io::stdin()
-                    .read_line(&mut input)
-                    .expect("Failed to read input");
-                let input = input.trim();
-                let value = if input.is_empty() {
-                    if debug_enabled {
-                        println!(
-                            "{} {}",
-                            "DEBUG:".bright_blue().bold(),
-                            "Action: Using default value".green()
-                        );
-                    }
-                    default
-                } else {
-                    if debug_enabled {
-                        println!(
-                            "{} {}",
-                            "DEBUG:".bright_blue().bold(),
-                            format!("Action: Using provided value: {}", input).green()
-                        );
-                    }
-                    input.to_string()
-                };
+            let env_value = env::var(&key).ok();
+            let is_interactive = io::stdin().is_terminal();
 
-                if debug_enabled {
-                    println!(
-                        "{} {}",
-                        "DEBUG:".bright_blue().bold(),
-                        format!("Action: Setting ARG variable: {}={}", key, value).magenta()
-                    );
-                }
-                env::set_var(key, value);
-            } else {
-                let env_value = env::var(&key).ok();
-                if debug_enabled {
-                    println!(
-                        "{} {}",
-                        "DEBUG:".bright_blue().bold(),
-                        format!("Action: Found ARG without default value: {}", key).yellow()
-                    );
-                    if let Some(ref val) = env_value {
-                        println!(
-                            "{} {}",
-                            "DEBUG:".bright_blue().bold(),
-                            format!("Action: Found environment value: {}", val).yellow()
-                        );
-                    }
-                }
+            if debug_enabled {
+                println!(
+                    "{} {}",
+                    "DEBUG:".bright_blue().bold(),
+                    format!(
+                        "Action: Found ARG: {} (default: {:?}, env: {:?}, interactive: {})",
+                        key, default_value, env_value, is_interactive
+                    )
+                    .yellow()
+                );
+            }
+
+            let value = if is_interactive {
+                // Interactive mode: prompt for input
+                let prompt_default = default_value.as_ref().or(env_value.as_ref());
                 print!(
                     "Enter value for ARG {}{}: ",
                     key,
-                    env_value
-                        .as_ref()
-                        .map_or("".to_string(), |v| format!(" (default: {})", v))
+                    prompt_default.map_or("".to_string(), |v| format!(" (default: {})", v))
                 );
                 io::stdout().flush().expect("Failed to flush stdout");
                 let mut input = String::new();
@@ -286,25 +257,22 @@ fn main() {
                     .read_line(&mut input)
                     .expect("Failed to read input");
                 let input = input.trim();
-                let value = if input.is_empty() {
-                    if let Some(env_val) = env_value {
+                if input.is_empty() {
+                    if let Some(val) = default_value.or(env_value) {
                         if debug_enabled {
                             println!(
                                 "{} {}",
                                 "DEBUG:".bright_blue().bold(),
-                                "Action: Using environment value".green()
+                                format!("Action: Using default/env value: {}", val).green()
                             );
                         }
-                        env_val
+                        val
                     } else {
-                        if debug_enabled {
-                            println!(
-                                "{} {}",
-                                "DEBUG:".bright_blue().bold(),
-                                "Action: No value provided".red()
-                            );
-                        }
-                        eprintln!("Error: No value provided for ARG {}", key);
+                        eprintln!(
+                            "{} {}",
+                            "Error:".red().bold(),
+                            format!("No value provided for ARG {}", key).bright_white()
+                        );
                         std::process::exit(1);
                     }
                 } else {
@@ -316,17 +284,49 @@ fn main() {
                         );
                     }
                     input.to_string()
-                };
-
-                if debug_enabled {
-                    println!(
-                        "{} {}",
-                        "DEBUG:".bright_blue().bold(),
-                        format!("Action: Setting ARG variable: {}={}", key, value).magenta()
-                    );
                 }
-                env::set_var(key, value);
+            } else {
+                // Non-interactive mode: use env value, then default, or error
+                if let Some(val) = env_value {
+                    if debug_enabled {
+                        println!(
+                            "{} {}",
+                            "DEBUG:".bright_blue().bold(),
+                            format!("Action: Using environment value: {}", val).green()
+                        );
+                    }
+                    val
+                } else if let Some(val) = default_value {
+                    if debug_enabled {
+                        println!(
+                            "{} {}",
+                            "DEBUG:".bright_blue().bold(),
+                            format!("Action: Using default value: {}", val).green()
+                        );
+                    }
+                    val
+                } else {
+                    eprintln!(
+                        "{} {}",
+                        "Error:".red().bold(),
+                        format!(
+                            "No value provided for ARG {} (non-interactive mode requires default or environment variable)",
+                            key
+                        )
+                        .bright_white()
+                    );
+                    std::process::exit(1);
+                }
             };
+
+            if debug_enabled {
+                println!(
+                    "{} {}",
+                    "DEBUG:".bright_blue().bold(),
+                    format!("Action: Setting ARG variable: {}={}", key, value).magenta()
+                );
+            }
+            env::set_var(&key, &value);
         } else if !line.is_empty() && !line.starts_with('#') && debug_enabled {
             println!(
                 "{} {}",
